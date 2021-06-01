@@ -1,14 +1,15 @@
 import hashlib
 import math
 
+# couldn't install the libraries but its needed from input 5,6,7
+
 # from cryptography.hazmat.primitives.asymmetric import rsa
 # from cryptography.hazmat.backends import default_backend
 # from cryptography.hazmat.primitives import serialization
 # from cryptography.hazmat.primitives import hashes
 # from cryptography.hazmat.primitives.asymmetric import padding
 
-
-
+# hash func
 def calculate_hash_for_constructor(value):
     value_encode = value.encode('utf-8')
     return hashlib.sha256(value_encode).hexdigest()
@@ -17,17 +18,21 @@ def calculate_hash_for_constructor(value):
 class NodeOfMerkleTree:
     def __init__(self, value, index):
         # self.hashed_value = calculate_hash_for_constructor(value)
-        self.value = value
+        self.value = value # set value as number just for check all the program
         self.left_node = None
         self.right_node = None
-        self.index = index
+        self.index = index # index of the node in the node list -- we need it dont delete.
 
 
 # merkel tree is an almost complete tree
 # we will use dynamic list for the tree
+
 def invalid_input():
     print("invalid input\n") # should print just \n
 
+
+# i changed the signature of the class didn't worked with object
+# and i dont know why is needed
 class MerkelTree:
     def __init__(self):
         self.nodesList = []
@@ -52,15 +57,12 @@ class MerkelTree:
                     self.nodesList[parent_index].right_node = self.nodesList[last_index]
 
     def update_tree_after_insert(self): # helper input 1
-        max_len = int(len(self.nodesList) / 2)
+        max_len = int(len(self.nodesList) / 2) # max len is just half of the list
         if len(self.nodesList) % 2 == 1: # odd case -> should update
             for i in range(0, max_len):
-                # parent = self.nodesList[int((i - 1) / 2)]
-                # left_child = self.nodesList[(2 * i) + 1]
-                # right_child = self.nodesList[(2 * i) + 2]
                 self.nodesList[i].value = str(self.nodesList[(2 * i) + 1].value) + "+" + str(self.nodesList[(2 * i) + 2].value)
-
-        # print(parent.value)
+        # for even case we will not update the merkle tree cuz we update the parent only when he have both child's
+        # print(parent.value) # just for check parent value
 
     def get_root(self): # input 2
         return self.nodesList[0].value   #should return in hex
@@ -68,45 +70,48 @@ class MerkelTree:
     def proof_of_inclusion(self, leaf_number): # input 3
         proof = str(self.nodesList[0].value) # proof start with root
 
+        # if the list contain just one node (the root) -> return the proof.
         if len(self.nodesList) is 1:
             return proof
 
         # finding the leaf number zero (the most left leaf)
         i = 0
-        if self.nodesList[i].left_node != None:
+        if self.nodesList[i].left_node != None: # needed for edge case
             i += 1
-        while (self.nodesList[i].left_node != None):
+        while (self.nodesList[i].left_node != None): # keep calculating general case's
             i *= 2
         leaf_zero = self.nodesList[i - 1]
 
+        # now we should check if we got wrong number as input goto error
         # if (leaf_number >  amount_of_leafs): # bad input, should check cases
         #     invalid_input()
 
         #print(leaf_zero.value) # just for check
-        # the specific given leaf
+
+        # finding the specific given leaf as input
         leaf = self.nodesList[leaf_zero.index + leaf_number]
-        leaf_ptr = leaf
+        leaf_ptr = leaf # define ptr that will "jump" on the tree
         #print(leaf.value) # just for check
         # collecting the nodes necessary to proof
-        # define leaf_ptr as leaf parent
+        # make leaf_ptr as leaf parent
         if leaf_ptr.index % 2 == 1:  # leaf is left child
             parent_index = math.floor(leaf_ptr.index / 2)
-            if parent_index < 0:
+            if parent_index < 0: # needed for edge cases
                 parent_index = 0
             leaf_parent = self.nodesList[parent_index]
-            proof += " "
+            proof += " "               # adding to the proof
             proof += str(leaf_parent.right_node.value)
         else:  # right child
             parent_index = math.floor(leaf_ptr.index / 2) - 1
-            if parent_index < 0:
+            if parent_index < 0: # needed for edge cases
                 parent_index = 0
             leaf_parent = self.nodesList[parent_index]
-            proof += " "
+            proof += " "               # adding to the proof
             proof += str(leaf_parent.left_node.value)
 
-        leaf_ptr = leaf_parent
+        leaf_ptr = leaf_parent # jump to the parent
 
-        while (leaf_ptr != self.nodesList[0]):
+        while (leaf_ptr != self.nodesList[0]): # keep calculating general case's
             if leaf_ptr.index % 2 == 1:  # leaf is left child
                 leaf_parent = self.nodesList[int(leaf_ptr.index / 2)]
                 proof += " "
@@ -117,32 +122,39 @@ class MerkelTree:
                 proof += str(leaf_parent.left_node.value)
             leaf_ptr = leaf_parent
 
-        print(proof) # just for check
+        print(proof) # just for check the proof
+        # if u dont know what the proof looks like see hemi explanation this question in
+        # tirgul6 when he explained the homework
         return proof
 
     def check_proof_of_inclusion(self, string_value, proof): # input 4
         # finding the leaf number zero (the most left leaf)
         i = 0
-        if self.nodesList[i].left_node != None:
+        if self.nodesList[i].left_node != None: # needed for edge case
             i += 1
-        while (self.nodesList[i].left_node != None):
+        while (self.nodesList[i].left_node != None): # keep calculating general case's
             i *= 2
         leaf_zero = self.nodesList[i - 1]
+        # edge case -> the leaf given is the most left leaf aka leaf_zero
         if leaf_zero.value is string_value:
             leaf = leaf_zero
-        else:
+        else: # general case -> should find the leaf as given in input with its value
             for j in range(leaf_zero.index + 1, len(self.nodesList)):
                 if self.nodesList[j].value is string_value:
                     leaf = self.nodesList[j]
 
 
+        # take the actually correct proof using the function above
         correct_proof = self.proof_of_inclusion(leaf.index - leaf_zero.index)
-        if correct_proof == proof:
+        if correct_proof == proof: # compare the proof's and return result
             print("True") # just for check
             return True
         print("False")  # just for check
         return False
 
+
+    # here its the code hemi gave us from make rsa and signitaure i couldn't run it but its looks like this
+    # check it, its just copy paste from hemi he says we need to do that
 
     # def generate_keys(self): # input 5
     #     private_key = rsa.genetate_private_key(public_exponent=65537,
