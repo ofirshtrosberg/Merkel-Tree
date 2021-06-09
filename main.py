@@ -6,21 +6,37 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 
+# need to change to 256 now its 4 just for check
+last_level_sparse_tree = 4
+
 
 # we will use it in the end just for now use string values
 
-# # hash funcs
-# def calculate_hash_for_constructor(value):
-#     value_encode = value.encode('utf-8')
-#     return hashlib.sha256(value_encode).hexdigest()
+# hash funcs
+def calculate_hash(value):
+    value_encode = value.encode('utf-8')
+    return hashlib.sha256(value_encode).hexdigest()
 
 
 class Node:
     def __init__(self, value):
-        # self.hashed_value = calculate_hash_for_constructor(value)
+        # self.hashed_value = calculate_hash(value)
         self.value = str(value)  # remove str in the end just for check
         self.left = None
         self.right = None
+        self.parent = None
+        self.depth = 0
+
+
+class NodeSparseTree:
+    def __init__(self, value, depth):
+        # self.hashed_value = calculate_hash(value)
+        self.value = value  # remove str in the end just for check
+        self.left = None
+        self.right = None
+        self.parent = None
+        self.depth = depth
+        # self.index_in_the_tree = index_in_the_tree
 
 
 # need to fix it
@@ -196,24 +212,98 @@ class MerkelTree:
     #
     #     # maybe need to add padding like Hemi did
 
-    def sparse(self, argument):
-        print(argument)
-
     def print_mt(self):  # just for check
         for i in range(0, len(self.leafsList)):
             print(self.leafsList[i].value)
 
 
-def main():
-    mt = MerkelTree()
-    for i in range(0, 6):
-        mt.insert_leaf(i)
+def calculate_zero_hash():
+    zero_hash_by_depth = []
+    for i in range(0, last_level_sparse_tree + 1):
+        zero_hash_by_depth.append(None)
+    value = "0"
+    zero_hash_by_depth[len(zero_hash_by_depth) - 1] = value
+    for i in range(last_level_sparse_tree - 1, -1, -1):
+        # value = calculate_hash(value + value)
+        # zero_hash_by_depth[i] = value
+        value += value  # just for check
+        zero_hash_by_depth[i] = value  # for check
+    return zero_hash_by_depth
 
-    mt.proof_of_inclusion(0)
-    # check input 4 ::
-    check_input4_string = "012345 5 0123"
-    check_input4_leaf_value = "4"
-    mt.check_proof_of_inclusion(check_input4_leaf_value, check_input4_string)
+
+class SparseMerkleTree:
+    def __init__(self, zero_hash_by_depth):
+        # -1 means not updated yet
+        self.root = NodeSparseTree("-1", 0)
+        self.zero_hash_by_depth = zero_hash_by_depth
+
+    def insert_leaf(self, digest):
+        current_node = self.root
+        flag_error = 0
+        for i in range(0, len(digest)):
+            if digest[i] != "0" and digest[i] != "1":
+                flag_error = 1
+        ########
+        if len(digest) != last_level_sparse_tree:
+            flag_error = 1
+        if flag_error == 1:
+            print()
+            return
+        for i in range(0, len(digest)):
+            # left child
+            if digest[i] == "0":
+                if current_node.left is None:
+                    # -1 means not updated yet
+                    current_node.left = NodeSparseTree("-1", current_node.depth + 1)
+                else:
+                    current_node.left.value = "-1"
+                current_node.left.parent = current_node
+                current_node = current_node.left
+            # right child
+            # digest == 1
+            else:
+                if current_node.right is None:
+                    # -1 means not updated yet
+                    current_node.right = NodeSparseTree("-1", current_node.depth + 1)
+                else:
+                    current_node.right.value = "-1"
+                current_node.right.parent = current_node
+                current_node = current_node.right
+            if current_node.depth == last_level_sparse_tree:
+                current_node.value = "1"
+        self.update_path(digest)
+
+    # update from leaves to root values
+
+    def update_path(self, digest):
+        current_node = self.root
+        for i in range(0, len(digest)):
+            if digest[i] == "0":
+                current_node = current_node.left
+            else:
+                current_node = current_node.right
+        for i in range(0, len(digest)):
+            current_node = current_node.parent
+            if current_node.left is None:
+                left_child_value = self.zero_hash_by_depth[current_node.depth + 1]
+            else:
+                left_child_value = current_node.left.value
+            if current_node.right is None:
+                right_child_value = self.zero_hash_by_depth[current_node.depth + 1]
+            else:
+                right_child_value = current_node.right.value
+            current_node.value = left_child_value + right_child_value
+
+
+def main():
+    # mt = MerkelTree()
+    # for i in range(0, 6):
+    #     mt.insert_leaf(i)
+    # mt.proof_of_inclusion(0)
+    # # check input 4 ::
+    # check_input4_string = "012345 5 0123"
+    # check_input4_leaf_value = "4"
+    # mt.check_proof_of_inclusion(check_input4_leaf_value, check_input4_string)
 
     # keys = mt.generate_keys()
     # print(keys)
@@ -221,59 +311,72 @@ def main():
     # avoid conflict use the main from here below , above will be my checks
 
     # here
+    # mt.generate_mt()
 
-    while True:
-        input_line = input()
-        argument = ""
-        if input_line[0] == "1" and input_line[1] == " ":  # command 1
-            for i in range(2, len(input_line)):
-                argument = argument + input_line[i]
-            # need to add call to the relevant function
-        elif input_line[0] == "2" and input_line[1] == " ":  # command 2
-            for i in range(2, len(input_line)):
-                argument = argument + input_line[i]
-            # need to add call to the relevant function
-        elif input_line[0] == "3" and input_line[1] == " ":  # command 3
-            for i in range(2, len(input_line)):
-                argument = argument + input_line[i]
-            # need to add call to the relevant function
-        elif input_line[0] == "4" and input_line[1] == " ":  # command 4
-            for i in range(2, len(input_line)):
-                argument = argument + input_line[i]
-            # need to add call to the relevant function
-        elif input_line[0] == "5" and input_line[1] == " ":  # command 5
-            for i in range(2, len(input_line)):
-                argument = argument + input_line[i]
-            # need to add call to the relevant function
-        elif input_line[0] == "6" and input_line[1] == " ":  # command 6
-            for i in range(2, len(input_line)):
-                argument = argument + input_line[i]
-            # need to add call to the relevant function
-        elif input_line[0] == "7" and input_line[1] == " ":  # command 7
-            for i in range(2, len(input_line)):
-                argument = argument + input_line[i]
-            # need to add call to the relevant function
-        elif input_line[0] == "8" and input_line[1] == " ":  # command 8
-            for i in range(2, len(input_line)):
-                argument = argument + input_line[i]
-            mt.sparse(argument)
-        elif input_line[0] == "9" and input_line[1] == " ":  # command 9
-            for i in range(2, len(input_line)):
-                argument = argument + input_line[i]
-            # need to add call to the relevant function
-        elif input_line[0] == "10" and input_line[1] == " ":  # command 10
-            for i in range(2, len(input_line)):
-                argument = argument + input_line[i]
-            # need to add call to the relevant function
-        elif input_line[0] == "11" and input_line[1] == " ":  # command 11
-            for i in range(2, len(input_line)):
-                argument = argument + input_line[i]
-            # need to add call to the relevant function
-        else:  # invalid input
-            print("\n")
+    # check still without hash
+    zero_hash = calculate_zero_hash()
+    print("arr", zero_hash)
+    merkle_sparse = SparseMerkleTree(zero_hash)
+    merkle_sparse.insert_leaf("0000")
+    print(merkle_sparse.root.value)
+    print(merkle_sparse.root.left.value)
+    print(merkle_sparse.root.left.left.value)
+    print(merkle_sparse.root.left.left.left.value)
+    print(merkle_sparse.root.left.left.left.left.value)
+    print("root")
+    # print(merkle_sparse.nodesList[1].right)
 
+    # commands menu down here
 
-#
+    # while True:
+    #     input_line = input()
+    #     argument = ""
+    #     if input_line[0] == "1" and input_line[1] == " ":  # command 1
+    #         for i in range(2, len(input_line)):
+    #             argument = argument + input_line[i]
+    #         # need to add call to the relevant function
+    #     elif input_line[0] == "2" and input_line[1] == " ":  # command 2
+    #         for i in range(2, len(input_line)):
+    #             argument = argument + input_line[i]
+    #         # need to add call to the relevant function
+    #     elif input_line[0] == "3" and input_line[1] == " ":  # command 3
+    #         for i in range(2, len(input_line)):
+    #             argument = argument + input_line[i]
+    #         # need to add call to the relevant function
+    #     elif input_line[0] == "4" and input_line[1] == " ":  # command 4
+    #         for i in range(2, len(input_line)):
+    #             argument = argument + input_line[i]
+    #         # need to add call to the relevant function
+    #     elif input_line[0] == "5" and input_line[1] == " ":  # command 5
+    #         for i in range(2, len(input_line)):
+    #             argument = argument + input_line[i]
+    #         # need to add call to the relevant function
+    #     elif input_line[0] == "6" and input_line[1] == " ":  # command 6
+    #         for i in range(2, len(input_line)):
+    #             argument = argument + input_line[i]
+    #         # need to add call to the relevant function
+    #     elif input_line[0] == "7" and input_line[1] == " ":  # command 7
+    #         for i in range(2, len(input_line)):
+    #             argument = argument + input_line[i]
+    #         # need to add call to the relevant function
+    #     elif input_line[0] == "8" and input_line[1] == " ":  # command 8
+    #         for i in range(2, len(input_line)):
+    #             argument = argument + input_line[i]
+    #         mt.sparse(argument)
+    #     elif input_line[0] == "9" and input_line[1] == " ":  # command 9
+    #         for i in range(2, len(input_line)):
+    #             argument = argument + input_line[i]
+    #         # need to add call to the relevant function
+    #     elif input_line[0] == "10" and input_line[1] == " ":  # command 10
+    #         for i in range(2, len(input_line)):
+    #             argument = argument + input_line[i]
+    #         # need to add call to the relevant function
+    #     elif input_line[0] == "11" and input_line[1] == " ":  # command 11
+    #         for i in range(2, len(input_line)):
+    #             argument = argument + input_line[i]
+    #         # need to add call to the relevant function
+    #     else:  # invalid input
+    #         print("\n")
 
 
 if __name__ == "__main__":
