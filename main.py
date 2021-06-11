@@ -294,6 +294,44 @@ class SparseMerkleTree:
                 right_child_value = current_node.right.value
             current_node.value = left_child_value + right_child_value
 
+    # still need to improve the case in which the current digest is not in the tree
+    # need to add the leaf to b?
+    def proof_of_inclusion(self, digest):
+        b = []
+        current_node = self.root
+        # find the leaf
+        for i in range(0, len(digest)):
+            if digest[i] != "0" and digest[i] != "1":
+                print()
+                return
+            elif digest[i] == "0":
+                if current_node.left is None:
+                    b.append(self.zero_hash_by_depth[current_node.depth+1])
+                    return b
+                else:
+                    current_node = current_node.left
+            else:
+                if current_node.right is None:
+                    b.append(self.zero_hash_by_depth[current_node.depth + 1])
+                    return b
+                else:
+                    current_node = current_node.right
+        for i in range(len(digest)-1, -1, -1):
+            current_node = current_node.parent
+            if digest[i] == "0":
+                if current_node.right is None:
+                    value = self.zero_hash_by_depth[current_node.depth+1]
+                else:
+                    value = current_node.right.value
+                b.append(value)
+            if digest[i] == "1":
+                if current_node.left is None:
+                    value = self.zero_hash_by_depth[current_node.depth+1]
+                else:
+                    value = current_node.left.value
+                b.append(value)
+        return b
+    # def check_proof_of_inclusion(self, digest, flag, proof):
 
 def main():
     # mt = MerkelTree()
@@ -324,6 +362,8 @@ def main():
     print(merkle_sparse.root.left.left.left.value)
     print(merkle_sparse.root.left.left.left.left.value)
     print("root")
+    print(merkle_sparse.proof_of_inclusion("0000"))
+
     # print(merkle_sparse.nodesList[1].right)
 
     # commands menu down here
