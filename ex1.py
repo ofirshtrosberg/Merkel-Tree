@@ -6,18 +6,41 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
-from cryptography.exceptions import InvalidSignature
+# from cryptography.exceptions import InvalidSignature
 import base64
 
-def calculate_hash_for_constructor(value):
+last_level_sparse_tree = 4
+
+
+def hex_to_binary(data):
+    return str(bin(int(data, 16))[2:].zfill(len(data) * 4))
+
+
+def calculate_hash(value):
     value_encode = value.encode('utf-8')
     return hashlib.sha256(value_encode).hexdigest()
 
+
+def calculate_zero_hash():
+    zero_hash_by_depth = []
+    for i in range(0, last_level_sparse_tree + 1):
+        zero_hash_by_depth.append(None)
+    value = "0"
+    zero_hash_by_depth[len(zero_hash_by_depth) - 1] = value
+    for i in range(last_level_sparse_tree - 1, -1, -1):
+        # value = calculate_hash(value + value)
+        # zero_hash_by_depth[i] = value
+        value += value  # just for check
+        zero_hash_by_depth[i] = value  # for check
+    return zero_hash_by_depth
+
+
 class Node:
     def __init__(self, value):
-        self.value = calculate_hash_for_constructor(value)
+        self.value = calculate_hash(value)
         self.left = None
         self.right = None
+
 
 class NodeSparseTree:
     def __init__(self, value, depth):
@@ -28,6 +51,7 @@ class NodeSparseTree:
         self.parent = None
         self.depth = depth
         # self.index_in_the_tree = index_in_the_tree
+
 
 class MerkelTree:
     def __init__(self):
@@ -45,7 +69,7 @@ class MerkelTree:
             nodes.append(mt_nodes[0])
         else:
             while True:
-                if (len(mt_nodes) == 1): # while until get the root
+                if (len(mt_nodes) == 1):  # while until get the root
                     break
                 level_nodes = []  # store the nodes of each level
                 for i in range(0, len(mt_nodes), 2):
@@ -68,10 +92,10 @@ class MerkelTree:
         unique_nodes = []
         for i in reversed(nodes):
             unique_nodes.append(i)
-        for i in range(1, len(unique_nodes), 2): # swap the values to represent heap correct
+        for i in range(1, len(unique_nodes), 2):  # swap the values to represent heap correct
             if (i + 1) < len(unique_nodes):
                 unique_nodes[i], unique_nodes[i + 1] = unique_nodes[i + 1], unique_nodes[i]
-        for i in range(0, (len(unique_nodes))): # fix the heap: nodesList
+        for i in range(0, (len(unique_nodes))):  # fix the heap: nodesList
             if unique_nodes[i] not in self.nodesList:
                 self.nodesList.insert(i, unique_nodes[i])
             if unique_nodes[i].left not in self.nodesList:
@@ -82,15 +106,15 @@ class MerkelTree:
 
     def get_root(self):  # input 2
         if len(self.leavesList) == 0:
-            print() # invalid input
+            print()  # invalid input
         else:
             print(self.nodesList[0].value)
-            #return self.nodesList[0]
+            # return self.nodesList[0]
 
     def proof_of_inclusion(self, leaf_idx):  # input 3
         leaf_number = int(leaf_idx)
         if len(self.nodesList) == 0:  # no nodes - edge case
-            print() # invalid input
+            print()  # invalid input
             return
         proof = []
         proof.append(self.nodesList[0].value)  # proof start with root
@@ -100,7 +124,7 @@ class MerkelTree:
         # finding the specific given leaf
         leaf = self.leavesList[leaf_number]
         leaf_ptr = leaf  # define ptr that will "jump" on the tree
-        leaf_ptr_index = self.nodesList.index(leaf_ptr) # get index in nodesList
+        leaf_ptr_index = self.nodesList.index(leaf_ptr)  # get index in nodesList
 
         if leaf_ptr_index % 2 == 1:  # leaf is left child
             parent_index = math.floor(leaf_ptr_index / 2)
@@ -138,14 +162,14 @@ class MerkelTree:
         return str_proof
 
     def check_proof_of_inclusion(self, string_value, proof):  # input 4
-        value_hashed = calculate_hash_for_constructor(string_value)
+        value_hashed = calculate_hash(string_value)
         index = None
         for i in range(0, len(self.leavesList)):
             if self.leavesList[i].value == value_hashed:
                 index = i
                 break
         if index == None:
-            print() # invalid
+            print()  # invalid
             return
 
         correct_proof = self.proof_of_inclusion(index)
@@ -178,7 +202,7 @@ class MerkelTree:
         k = serialization.load_pem_private_key(key.encode(), None, default_backend())
         signature = k.sign(
             base64.b64encode(self.nodesList[0].value.encode()),
-            #self.nodesList[0].value.encode(),
+            # self.nodesList[0].value.encode(),
             padding.PSS(
                 mgf=padding.MGF1(hashes.SHA256()),
                 salt_length=padding.PSS.MAX_LENGTH
@@ -205,22 +229,10 @@ class MerkelTree:
             return False
 
 
-def calculate_zero_hash():
-    zero_hash_by_depth = []
-    for i in range(0, last_level_sparse_tree + 1):
-        zero_hash_by_depth.append(None)
-    value = "0"
-    zero_hash_by_depth[len(zero_hash_by_depth) - 1] = value
-    for i in range(last_level_sparse_tree - 1, -1, -1):
-        # value = calculate_hash(value + value)
-        # zero_hash_by_depth[i] = value
-        value += value  # just for check
-        zero_hash_by_depth[i] = value  # for check
-    return zero_hash_by_depth
-
+# node with -1 means not updated yet
+# zero_hash_by_depth: array of default hash values for each depth
 class SparseMerkleTree:
     def __init__(self, zero_hash_by_depth):
-        # -1 means not updated yet
         self.root = NodeSparseTree("-1", 0)
         self.zero_hash_by_depth = zero_hash_by_depth
 
@@ -230,7 +242,6 @@ class SparseMerkleTree:
         for i in range(0, len(digest)):
             if digest[i] != "0" and digest[i] != "1":
                 flag_error = 1
-        ########
         if len(digest) != last_level_sparse_tree:
             flag_error = 1
         if flag_error == 1:
@@ -246,8 +257,7 @@ class SparseMerkleTree:
                     current_node.left.value = "-1"
                 current_node.left.parent = current_node
                 current_node = current_node.left
-            # right child
-            # digest == 1
+            # right child: digest == 1
             else:
                 if current_node.right is None:
                     # -1 means not updated yet
@@ -284,53 +294,112 @@ class SparseMerkleTree:
     # still need to improve the case in which the current digest is not in the tree
     # need to add the leaf to b?
     def proof_of_inclusion(self, digest):
-        b = []
+        proof = []
+        proof.append(self.root.value)
         current_node = self.root
         # find the leaf
         for i in range(0, len(digest)):
-            if digest[i] != "0" and digest[i] != "1":
-                print()
-                return
-            elif digest[i] == "0":
+            if digest[i] == "0":
                 if current_node.left is None:
-                    b.append(self.zero_hash_by_depth[current_node.depth+1])
-                    return b
+                    for j in range(last_level_sparse_tree, current_node.depth, -1):
+                        proof.append(self.zero_hash_by_depth[j])
+                    depth = current_node.depth
+                    for k in range(depth, 0, -1):
+                        current_node = current_node.parent
+                        if digest[k] == "0":
+                            if current_node.right is None:
+                                value = self.zero_hash_by_depth[current_node.depth + 1]
+                            else:
+                                value = current_node.right.value
+                            proof.append(value)
+                        if digest[k] == "1":
+                            if current_node.left is None:
+                                value = self.zero_hash_by_depth[current_node.depth + 1]
+                            else:
+                                value = current_node.left.value
+                            proof.append(value)
+                    str_proof = " "
+                    str_proof += str_proof.join(proof)
+                    str_proof = str_proof[1:]
+                    return str_proof
                 else:
                     current_node = current_node.left
             else:
                 if current_node.right is None:
-                    b.append(self.zero_hash_by_depth[current_node.depth + 1])
-                    return b
+                    for j in range(last_level_sparse_tree, current_node.depth, -1):
+                        proof.append(self.zero_hash_by_depth[j])
+                    depth = current_node.depth
+                    for k in range(depth, 0, -1):
+                        current_node = current_node.parent
+                        if digest[k] == "0":
+                            if current_node.right is None:
+                                value = self.zero_hash_by_depth[current_node.depth + 1]
+                            else:
+                                value = current_node.right.value
+                            proof.append(value)
+                        if digest[k] == "1":
+                            if current_node.left is None:
+                                value = self.zero_hash_by_depth[current_node.depth + 1]
+                            else:
+                                value = current_node.left.value
+                            proof.append(value)
+                    str_proof = " "
+                    str_proof += str_proof.join(proof)
+                    str_proof = str_proof[1:]
+                    return str_proof
                 else:
                     current_node = current_node.right
-        for i in range(len(digest)-1, -1, -1):
+        for i in range(len(digest) - 1, -1, -1):
             current_node = current_node.parent
             if digest[i] == "0":
                 if current_node.right is None:
-                    value = self.zero_hash_by_depth[current_node.depth+1]
+                    value = self.zero_hash_by_depth[current_node.depth + 1]
                 else:
                     value = current_node.right.value
-                b.append(value)
+                proof.append(value)
             if digest[i] == "1":
                 if current_node.left is None:
-                    value = self.zero_hash_by_depth[current_node.depth+1]
+                    value = self.zero_hash_by_depth[current_node.depth + 1]
                 else:
                     value = current_node.left.value
-                b.append(value)
-        return b
-    # def check_proof_of_inclusion(self, digest, flag, proof):
+                proof.append(value)
+        str_proof = " "
+        str_proof += str_proof.join(proof)
+        str_proof = str_proof[1:]
+        return str_proof
 
+    def check_proof_of_inclusion(self, digest, flag, proof):
+        if proof is None:
+            return False
+        else:
+            proof_split = proof.split()
+            root = proof_split[0]
+            calculate_root = str(flag)
+            for i in range(1, len(proof_split)):
+                calculate_root += proof_split[i]
+            if calculate_root == root:
+                return True
+            return False
+
+
+zero_hash = calculate_zero_hash()
 mt = MerkelTree()
+mt_sparse = SparseMerkleTree(zero_hash)
+mt_sparse.insert_leaf("0000")
+proof = mt_sparse.proof_of_inclusion("1111")
+print(proof)
+print(mt_sparse.check_proof_of_inclusion("0000", 1, proof))
+# print(mt_sparse.proof_of_inclusion("1000"))
 while True:
     input_line = input()
-    #print(input())
+    # print(input())
     option = input_line[:1]
     args = input_line[2:]
-    #print(args)
+    # print(args)
     if option == "1":
         mt.insert_leaf(args)
     elif option == "2":
-        mt.get_root() # check if should returned or printed value
+        mt.get_root()  # check if should returned or printed value
     elif option == "3":
         print(mt.proof_of_inclusion(args))
     elif option == "4":
@@ -344,50 +413,13 @@ while True:
         print("here")
         # args_arr = args.split(" ", 2)
         # print(mt.verify_signature(args_arr[1], args_arr[2], args_arr[3]))
-
-    # if input_line[0] == "1" and input_line[1] == " ":  # command 1
-    #     for i in range(2, len(input_line)):
-    #         argument = argument + input_line[i]
-    #     # need to add call to the relevant function
-    # elif input_line[0] == "2" and input_line[1] == " ":  # command 2
-    #     for i in range(2, len(input_line)):
-    #         argument = argument + input_line[i]
-    #     # need to add call to the relevant function
-    #     elif input_line[0] == "3" and input_line[1] == " ":  # command 3
-    #     for i in range(2, len(input_line)):
-    #         argument = argument + input_line[i]
-    #     # need to add call to the relevant function
-    # elif input_line[0] == "4" and input_line[1] == " ":  # command 4
-    #     for i in range(2, len(input_line)):
-    #         argument = argument + input_line[i]
-    #     # need to add call to the relevant function
-    # elif input_line[0] == "5" and input_line[1] == " ":  # command 5
-    #     for i in range(2, len(input_line)):
-    #         argument = argument + input_line[i]
-    #     # need to add call to the relevant function
-    # elif input_line[0] == "6" and input_line[1] == " ":  # command 6
-    #     for i in range(2, len(input_line)):
-    #         argument = argument + input_line[i]
-    #     # need to add call to the relevant function
-    # elif input_line[0] == "7" and input_line[1] == " ":  # command 7
-    #     for i in range(2, len(input_line)):
-    #         argument = argument + input_line[i]
-    #     # need to add call to the relevant function
-    # elif input_line[0] == "8" and input_line[1] == " ":  # command 8
-    #     for i in range(2, len(input_line)):
-    #         argument = argument + input_line[i]
-    #     mt.sparse(argument)
-    # elif input_line[0] == "9" and input_line[1] == " ":  # command 9
-    #     for i in range(2, len(input_line)):
-    #         argument = argument + input_line[i]
-    #     # need to add call to the relevant function
-    # elif input_line[0] == "10" and input_line[1] == " ":  # command 10
-    #     for i in range(2, len(input_line)):
-    #         argument = argument + input_line[i]
-    #     # need to add call to the relevant function
-    # elif input_line[0] == "11" and input_line[1] == " ":  # command 11
-    #     for i in range(2, len(input_line)):
-    #         argument = argument + input_line[i]
-    #     # need to add call to the relevant function
-    # else:  # invalid input
-    #     print("\n")
+    elif option == "8":
+        print("here")
+    elif option == "9":
+        print("here")
+    elif option == "10":
+        print("here")
+    elif option == "11":
+        print("here")
+    else:
+        print()
